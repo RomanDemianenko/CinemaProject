@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'cinema.html' %}
 <h1>Update</h1>
 {% block content %}
     {% for obj in object_list %}
@@ -7,27 +7,29 @@
             <h2>{{ obj.title }}</h2>
 
             {#                <p style="font-size: 30px">Characteristic: {{ obj.description }}</p>#}
-            <p style="font-size: 20px">Hall: {{ obj.hall }} from {{ obj.start }} to {{ obj.end }}</p>
+            <p style="font-size: 20px">Hall: {{ obj.hall }} </p>
+            <p style="font-size: 20px">Date: from {{ obj.date_start }} to {{ obj.date_end }}</p>
+            <p style="font-size: 20px">Time: from {{ obj.start }} to {{ obj.end }}</p>
 
             {% if  obj.hall.places %}
-                <p style="color: blue; font-size: 20px">{{ obj.hall.places }} places left for {{ obj.ticket_value }}
+                <p style="color: blue; font-size: 20px">{{ obj.seats }} places left for {{ obj.ticket_value }}
                     UAH</p>
             {% else %}
                 <p style="font-size: 25px; color: darkgoldenrod">Places is OVER</p>
                 {#                <p style="font-size: 30px; color: red">{{ obj.ticket_value }}</p>#}
             {% endif %}
-            <form method="POST" action="{% url 'update_hall' obj.id %}">
-                {% csrf_token %}
-                {% if user.is_superuser %}
-                    <button><a href="{% url 'update_hall' obj.id %}"></a>Change Hall</button>
-                {% endif %}
-            </form>
-            <form method="POST" action="{% url 'update_seance' obj.id %}">
-                {% csrf_token %}
-                {% if user.is_superuser %}
-                    <button><a href="{% url 'update_seance' obj.id %}"></a>Change Seance</button>
-                {% endif %}
-            </form>
+{#                        <form method="POST" action="{% url 'update_hall' obj.id %}">#}
+            {#                {% csrf_token %}#}
+            {#                {% if user.is_superuser %}#}
+            {#                    <button><a href="{% url 'update_hall' obj.id %}"></a>Change Hall</button>#}
+            {#                {% endif %}#}
+            {#            </form>#}
+            {#            <form method="POST" action="{% url 'update_seance' obj.id %}">#}
+            {#                {% csrf_token %}#}
+            {#                {% if user.is_superuser %}#}
+            {#                    <button><a href="{% url 'update_seance' obj.id %}"></a>Change Seance</button>#}
+            {#                {% endif %}#}
+            {#            </form>#}
         </form>
         <form method="POST" action="{% url 'buying' %}">
             {% csrf_token %}
@@ -39,7 +41,7 @@
                 <button>Buy</button>
             {% endif %}
         </form>
-            <div class="pagination">
+        <div class="pagination">
     <span class="step-links">
         {% if page_obj.has_previous %}
             <a href="?page=1">&laquo; first</a>
@@ -55,7 +57,7 @@
             <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
         {% endif %}
     </span>
-    </div>
+        </div>
     {% endfor %}
 
 

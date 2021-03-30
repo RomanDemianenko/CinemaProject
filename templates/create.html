@@ -1,6 +1,17 @@
-{% extends 'base.html' %}
+{% extends 'cinema.html' %}
 <h1>Create</h1>
+
 {% block content %}
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                <strong>{{ message }}</strong>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
     <form method="POST">
         {% csrf_token %}
         {#        <p>{{ field.non_field_errors }}</p>#}

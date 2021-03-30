@@ -1,8 +1,11 @@
 from django.shortcuts import render
+from django import template
+from django.utils.timezone import utc
 from django.views.generic import TemplateView, ListView, CreateView, UpdateView, RedirectView
 from django.views.generic.base import View
-from datetime import datetime, timezone, timedelta, date, time
-from django.db.models import Sum, Avg, Func, F, FloatField
+from datetime import datetime, timedelta, date, time
+from django.utils import timezone
+from django.db.models import Sum, Avg, Func, F, FloatField, Q
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.forms import AuthenticationForm
@@ -12,7 +15,10 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 
 # Create your views here.
-from mysite.forms import RegistrationForm, LoginForm, HallForm, SeanceForm, OrderForm
+from django_filters.views import FilterView
+
+
+from mysite.forms import RegistrationForm, LoginForm, HallForm, SeanceForm, OrderForm, SeanceUpdateForm
 from mysite.models import MyUser, Seance, Hall, Order
 
 
@@ -29,15 +35,16 @@ class UserLoginView(LoginView):
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
             user = authenticate(username=username, password=password)
+
             if user:
                 if user.is_active:
                     login(request, user)
                     messages.success(request, 'You are login')
-                    return HttpResponseRedirect('/')
-            else:
-                messages.warning(request, 'You have login already')
+                    return HttpResponseRedirect('/cinema/')
+
         else:
-            return HttpResponseRedirect('/')
+            messages.warning(request, 'Your login or password not correct')
+            return HttpResponseRedirect('/cinema/')
 
         context = {'form': form}
         return render(request, 'login.html', context)
@@ -65,141 +72,151 @@ class RegistrationView(CreateView):
             user = authenticate(username=form.cleaned_data['username'], password=form.cleaned_data['password'])
             login(request, user)
             messages.success(request, 'Welcome in our club')
-            return HttpResponseRedirect('/')
+            return HttpResponseRedirect('/cinema/')
         context = {'form': form}
         return render(request, 'registration.html', context)
 
 
 class UserLogout(LogoutView):
     template_name = 'log_out.html'
-    next_page = '/'
+    next_page = '/cinema/'
 
 
-class SeanceListView(ListView):
+class SeanceListView(ListView, FilterView):
     model = Seance
     form = SeanceForm
     ordering = ['-id']
-    paginate_by = 5
-    template_name = 'base.html'
+    paginate_by = 10
+    template_name = 'cinema.html'
 
     def get_ordering(self):
         ordering = self.request.GET.get('orderby')
         return ordering
+
+    def get_queryset(self):
+        ordering = self.request.GET.get('orderby')
+        if ordering == 'today':
+            queryset = Seance.objects.filter(date_start__lte=date.today(), date_end__gte=date.today()).order_by('start')
+        else:
+            queryset = Seance.objects.all()
+        return queryset
 
 
 class HallCreatView(PermissionRequiredMixin, CreateView):
     permission_required = 'request.user.is_superuser'
     model = Hall
     form_class = HallForm
-    success_url = '/'
+    success_url = '/cinema/'
     template_name = 'create.html'
 
 
 class SeanceUpdateView(PermissionRequiredMixin, UpdateView):
     permission_required = 'request.user.is_superuser'
     model = Seance
-    form_class = SeanceForm
+    form_class = SeanceUpdateForm
     template_name = 'update.html'
-    success_url = '/'
+    success_url = '/cinema/'
 
     def post(self, request, *args, **kwargs):
-        seance_id = self.kwargs['pk']
-        title = request.POST['title']
-        ticket_value = request.POST['ticket_value']
-        hall_id = request.POST['hall']
-        hall_create = Hall.objects.get(id=hall_id)
-        time_start = request.POST['start']
-        time_end = request.POST['end']
-        day_create = request.POST['date']
-
-        if Seance.objects.filter(hall=hall_create, date=day_create,
-                                 start__range=(time_start, time_end)).exclude(id=seance_id) or Seance.objects.filter(
-            hall=hall_create,
-            date=day_create,
-            end__range=(
-                    time_start,
-                    time_end)).exclude(id=seance_id):
-
-            messages.warning(self.request, 'You must change hall/date/time')
-
+        # seance = Seance.objects.get(pk=self.kwargs['pk'])
+        seance_pk = self.kwargs['pk']
+        seance = Seance.objects.get(id=seance_pk)
+        form = SeanceUpdateForm(request.POST, instance=seance)
+        if form.is_valid():
+            seance = form.save(commit=False)
+            # seance_id = self.kwargs['pk']
+            # seance = Seance.objects.get(id=seance_pk)
+            # seance.id = form.cleaned_data.get('pk')
+            # seance.title = form.cleaned_data['title']
+            # seance.ticket_value = form.cleaned_data['ticket_value']
+            # seance.hall = form.cleaned_data['hall']
+            # seance.tart = form.cleaned_data['start']
+            # seance.end = form.cleaned_data['end']
+            # seance.date_start = form.cleaned_data['date_start']
+            # seance.date_end = form.cleaned_data['date_end']
+            seance.seats = seance.hall.places
+            seance.save()
+            messages.success(self.request, "You Update the seance")
+            return HttpResponseRedirect('/cinema/')
         else:
-            Seance.objects.filter(id=seance_id).update(title=title, hall=hall_create,
-                                                       date=day_create,
-                                                       start=time_start,
-                                                       end=time_end,
-                                                       ticket_value=ticket_value,
-                                                       seats=hall_create.places)
+            messages.warning(self.request, 'You must change hall/date/time')
+        context = {'form': form}
+        return render(request, 'update.html', context)
 
-            messages.success(self.request, "You change the seance")
-
-        return HttpResponseRedirect('/')
+    # def post(self, request, *args, **kwargs):
+    #     seance_id = self.kwargs['pk']
+    #     title = request.POST['title']
+    #     ticket_value = request.POST['ticket_value']
+    #     hall_id = request.POST['hall']
+    #     hall_create = Hall.objects.get(id=hall_id)
+    #     time_start = request.POST['start']
+    #     time_end = request.POST['end']
+    #     day_create = request.POST['date']
+    #
+    #     if Seance.objects.filter(hall=hall_create, date=day_create,
+    #                              start__range=(time_start, time_end)).exclude(id=seance_id) or Seance.objects.filter(
+    #         hall=hall_create,
+    #         date=day_create,
+    #         end__range=(
+    #                 time_start,
+    #                 time_end)).exclude(id=seance_id):
+    #
+    #         messages.warning(self.request, 'You must change hall/date/time')
+    #
+    #     else:
+    #         Seance.objects.filter(id=seance_id).update(title=title, hall=hall_create,
+    #                                                    date=day_create,
+    #                                                    start=time_start,
+    #                                                    end=time_end,
+    #                                                    ticket_value=ticket_value,
+    #                                                    seats=hall_create.places)
+    #
+    #         messages.success(self.request, "You change the seance")
+    #
+    #     return HttpResponseRedirect('/')
 
 
 class SeanceCreatView(PermissionRequiredMixin, CreateView):
     permission_required = 'request.user.is_superuser'
     model = Seance
     form_class = SeanceForm
-    success_url = '/'
+    success_url = '/cinema/'
     template_name = 'create.html'
 
     def post(self, request, *args, **kwargs):
         form = SeanceForm(request.POST)
         if form.is_valid():
             seance = form.save(commit=False)
-            seance.title = form.cleaned_data['title']
-            seance.ticket_value = form.cleaned_data['ticket_value']
-            seance.hall = form.cleaned_data['hall']
-            # hall_id = form.cleaned_data['hall']
-            # seance.hall = Hall.objects.get(id=hall_id)
-            seance.time_start = form.cleaned_data['start']
-            seance.time_end = form.cleaned_data['end']
-            seance.day_create = form.cleaned_data['date']
+            # seance.title = form.cleaned_data['title']
+            # seance.ticket_value = form.cleaned_data['ticket_value']
+            # seance.hall = form.cleaned_data['hall']
+            # seance.start = form.cleaned_data['start']
+            # seance.end = form.cleaned_data['end']
+            # seance.date_start = form.cleaned_data['date_start']
+            # seance.date_end = form.cleaned_data['date_end']
             seance.seats = seance.hall.places
             seance.save()
             messages.success(self.request, "You create the new seance")
-            return HttpResponseRedirect('/')
+            return HttpResponseRedirect('/cinema/')
         else:
             messages.warning(self.request, 'You must change hall/date/time')
         context = {'form': form}
         return render(request, 'create.html', context)
 
 
-        # title = request.POST['title']
-        # ticket_value = request.POST['ticket_value']
-        # hall_id = request.POST['hall']
-        # hall_create = Hall.objects.get(id=hall_id)
-        # time_start = request.POST['start']
-        # time_end = request.POST['end']
-        # day_create = request.POST['date']
-
-        # if Seance.objects.filter(hall=hall_create, date=day_create,
-        #                          start__range=(time_start, time_end)) or Seance.objects.filter(hall=hall_create,
-        #                                                                                        date=day_create,
-        #                                                                                        end__range=(
-        #                                                                                                time_start,
-        #                                                                                                time_end)):
-        #
-        #     messages.warning(self.request, 'You must change hall/date/time')
-        #
-        # else:
-        #     seance = Seance.objects.create(title=title, hall=hall_create, date=day_create, start=time_start,
-        #                                    end=time_end,
-        #                                    ticket_value=ticket_value, seats=hall_create.places)
-        #     seance.save()
-        #     messages.success(self.request, "You create the new seance")
-
-        # return HttpResponseRedirect('/')
-
-
 class SeanceTodayListView(ListView):
     model = Seance
     form = SeanceForm
     paginate_by = 5
-    ordering = ['date']
+    ordering = ['date_start']
     template_name = 'today.html'
 
     def get_queryset(self):
-        queryset = Seance.objects.filter(date=date.today())
+        queryset = Seance.objects.filter(date_start__lte=date.today(), date_end__gte=date.today())
+        # a = str(date.today())
+        # q1 = Q(date_start__gte=date.today())
+        # q2 = Q(date_end__lte=date.today())
+        # queryset = Seance.objects.filter(q1 & q2)
         return queryset
 
 
@@ -207,11 +224,15 @@ class SeanceTomorrowListView(ListView):
     model = Seance
     form = SeanceForm
     paginate_by = 5
-    ordering = ['date']
+    ordering = ['date_start']
     template_name = 'tomorrow.html'
 
     def get_queryset(self):
-        queryset = Seance.objects.filter(date=date.today() + timedelta(days=1))
+        q1 = Q(date_start__lte=date.today() + timedelta(days=1))
+        q2 = Q(date_end__gte=date.today() + timedelta(days=1))
+        queryset = Seance.objects.filter(q1 & q2)
+        # queryset = Seance.objects.filter(date_start__lte=date.today() + timedelta(days=1),
+        #                                  date_end__gte=date.today() + timedelta(days=1))
         return queryset
 
 
@@ -219,11 +240,11 @@ class BuyingCreateView(LoginRequiredMixin, CreateView):
     login_url = '/login/'
     model = Order
     form_class = OrderForm
-    success_url = '/'
+    success_url = '/cinema/'
 
     def post(self, request, *args, **kwargs):
 
-        user_quantity = request.POST['places']
+        user_quantity = request.POST['tickets']
         user_quantity = int(user_quantity)
         seance_id = request.POST['seance']
         seance = Seance.objects.get(id=seance_id)
@@ -243,7 +264,7 @@ class BuyingCreateView(LoginRequiredMixin, CreateView):
                 messages.warning(self.request, 'You need to fill up a wallet')
         else:
             messages.warning(self.request, 'We don`t have enough staff')
-        return HttpResponseRedirect('/')
+        return HttpResponseRedirect('/cinema/')
 
 
 class OrdersListView(LoginRequiredMixin, ListView):
@@ -251,7 +272,7 @@ class OrdersListView(LoginRequiredMixin, ListView):
     form = OrderForm
     paginate_by = 5
     login_url = '/login/'
-    ordering = ['-date']
+    ordering = ['-date_start']
     template_name = 'my_orders.html'
 
     def get_queryset(self):

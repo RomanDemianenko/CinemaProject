@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from rest_framework.authtoken.models import Token
@@ -5,14 +7,6 @@ from rest_framework.authtoken.models import Token
 
 class MyUser(AbstractUser):
     cash = models.DecimalField(decimal_places=2, max_digits=15, default=10000)
-
-
-# class Places(models.Model):
-#     places = models.PositiveIntegerField(default=10)
-#
-#     class Meta:
-#         abstract = True
-#         ordering = ['places']
 
 
 class Hall(models.Model):
@@ -26,9 +20,6 @@ class Hall(models.Model):
     def __str__(self):
         return f'{self.hall} has {self.places} places'
 
-    # class Meta(Places.Meta):
-    #     pass
-
 
 def place_default():
     return Hall.places
@@ -37,7 +28,8 @@ def place_default():
 class Seance(models.Model):
     title = models.CharField(max_length=20)
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE)
-    date = models.DateField()
+    date_start = models.DateField()
+    date_end = models.DateField()
     start = models.TimeField()
     end = models.TimeField()
     ticket_value = models.DecimalField(decimal_places=2, max_digits=7)
@@ -45,15 +37,26 @@ class Seance(models.Model):
     seats = models.PositiveIntegerField(default=place_default)
 
     def __str__(self):
-        return f'{self.title} going from {self.start} to {self.end}'
+        return f'{self.title} going from {self.date_start} to {self.date_end} at {self.start} in {self.hall.hall}'
 
-    # class Meta(Hall.Meta):
-    #     pass
+    def validate_seats(self, ticket_count):
+        if self.seats >= ticket_count:
+            return True
+        return False
+
+    # @property
+    # def today(self):
+    #     today = Seance.objects.get(date_start__lte=date.today(), date_end__gte=date.today())
+    #     if today:
+    #         return today
+    #     return None
 
 
 class Order(models.Model):
     customer = models.ForeignKey(MyUser, on_delete=models.CASCADE)
     film = models.ForeignKey(Seance, on_delete=models.CASCADE)
     tickets = models.PositiveIntegerField(default=1)
-# class OurToken(Token):
-#     time_to_die = models.DateTimeField(null=True)
+
+
+class OurToken(Token):
+    time_to_die = models.DateTimeField(null=True)

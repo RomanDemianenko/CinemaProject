@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/3.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.1/ref/settings/
 """
-
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     'Cinema',
     'mysite',
     'rest_framework',
-    'mathfilters'
+    'mathfilters',
+    'django_filters'
 ]
 
 MIDDLEWARE = [
@@ -49,6 +50,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'mysite.middlewares.AutoLogout'
 ]
 
 ROOT_URLCONF = 'mysite.urls'
@@ -78,7 +80,7 @@ WSGI_APPLICATION = 'Cinema.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite6',
+        'NAME': BASE_DIR / 'db.sqlite8',
     }
 }
 
@@ -99,7 +101,17 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated'
+    ],
 
+}
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
 
@@ -121,3 +133,7 @@ STATIC_URL = '/static/'
 AUTH_USER_MODEL = 'mysite.MyUser'
 
 # SESSION_COOKIE_AGE = 5 * 60
+
+LOGOUT_TIME = timedelta(seconds=5 * 1)
+
+TIME_TO_DIE = timedelta(seconds=5 * 60)

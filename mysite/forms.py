@@ -1,4 +1,6 @@
 from django import forms
+from django.contrib import messages
+from django.db.models import Q
 from django.forms import ModelForm
 
 from mysite.models import MyUser, Hall, Seance, Order
@@ -45,30 +47,67 @@ class HallForm(ModelForm):
 
 class SeanceForm(ModelForm):
     def clean(self):
-        # title = self.cleaned_data.get('title')
-        # ticket_value = self.cleaned_data.get('ticket_value')
         hall = self.cleaned_data.get('hall')
-        # hall_create = Hall.objects.get(id=hall_id)
         time_start = self.cleaned_data.get('start')
         time_end = self.cleaned_data.get('end')
-        day_create = self.cleaned_data.get('date')
+        day_start = self.cleaned_data.get('date_start')
+        day_end = self.cleaned_data.get('date_end')
+        if day_end <= day_start:
+            raise forms.ValidationError("You should mix up date")
         if time_end <= time_start:
-            raise forms.ValidationError("You mix up time")
-        if Seance.objects.filter(hall=hall.id, date=day_create,
-                                 start__range=(time_start, time_end)) or Seance.objects.filter(hall=hall.id,
-                                                                                               date=day_create,
-                                                                                               end__range=(
-                                                                                                       time_start,
-                                                                                                       time_end)):
+            raise forms.ValidationError("You should mix up time")
+        q1 = Q(hall=hall.id, date_start__range=(day_start, day_end), start__range=(time_start, time_end))
+        q2 = Q(hall=hall.id, date_start__range=(day_start, day_end), end__range=(time_start, time_end))
+        q3 = Q(hall=hall.id, date_end__range=(day_start, day_end), start__range=(time_start, time_end))
+        q4 = Q(hall=hall.id, date_end__range=(day_start, day_end), end__range=(time_start, time_end))
+        if Seance.objects.filter(q1 | q2 | q3 | q4):
             raise forms.ValidationError('You must change hall/date/time')
         return self.cleaned_data
 
     class Meta:
         model = Seance
-        fields = ['title', 'hall', 'date', 'start', 'end', 'ticket_value']
+        fields = ['title', 'hall', 'date_start', 'date_end', 'start', 'end', 'ticket_value']
+
+
+class SeanceUpdateForm(ModelForm):
+    class Meta:
+        model = Seance
+        fields = ['id', 'title', 'hall', 'date_start', 'date_end', 'start', 'end', 'ticket_value']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        seance_id = self.instance.id
+        hall = self.cleaned_data.get('hall')
+        time_start = self.cleaned_data.get('start')
+        time_end = self.cleaned_data.get('end')
+        day_start = self.cleaned_data.get('date_start')
+        day_end = self.cleaned_data.get('date_end')
+        if day_end <= day_start:
+            raise forms.ValidationError("You should mix up date")
+        if time_end <= time_start:
+            raise forms.ValidationError("You should mix up time")
+        q1 = Q(hall=hall.id, date_start__range=(day_start, day_end), start__range=(time_start, time_end))
+        q2 = Q(hall=hall.id, date_start__range=(day_start, day_end), end__range=(time_start, time_end))
+        q3 = Q(hall=hall.id, date_end__range=(day_start, day_end), start__range=(time_start, time_end))
+        q4 = Q(hall=hall.id, date_end__range=(day_start, day_end), end__range=(time_start, time_end))
+        if Seance.objects.filter(q1 | q2 | q3 | q4).exclude(id=seance_id):
+            raise forms.ValidationError('You must change hall/date/time')
+
+        return self.cleaned_data
 
 
 class OrderForm(ModelForm):
     class Meta:
         model = Order
         fields = '__all__'
+
+    def is_valid(self):
+        user = self.data.get('customer')
+        user_cash = user.cash
+        film = self.data.get('film')
+        tickets = self.data.get('tickets')
+        if film.ticket_value * tickets > user_cash:
+            raise forms.ValidationError('heyyyyy?')
+        elif film.seats < tickets:
+            raise forms.ValidationError('WE don`t have enough items')
+        return self.data

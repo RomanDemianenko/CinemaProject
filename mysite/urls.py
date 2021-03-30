@@ -1,12 +1,19 @@
 from django.contrib import admin
 from django.urls import include, path, re_path
-
-# from mysite.views import
+from rest_framework import routers
+from rest_framework.authtoken import views
+from mysite.api.resourse import SeanceViewSet, OrderViewSet, HallViewSet
 from mysite.views import UserLoginView, RegistrationView, UserLogout, SeanceCreatView, HallCreatView, SeanceListView, \
     SeanceUpdateView, SeanceTodayListView, SeanceTomorrowListView, BuyingCreateView, OrdersListView
 
+router = routers.SimpleRouter()
+router.register(r'seance', SeanceViewSet, basename="seance")
+router.register(r'order', OrderViewSet)
+router.register(r'hall', HallViewSet)
+
 urlpatterns = [
-    path('', SeanceListView.as_view()),
+    path('cinema/', SeanceListView.as_view()),
+    path('api/', include(router.urls)),
     path('buying/', BuyingCreateView.as_view(), name='buying'),
     path('orders/', OrdersListView.as_view(), name='orders'),
     path('create_hall/', HallCreatView.as_view(), name='create_hall'),
@@ -19,4 +26,7 @@ urlpatterns = [
     path('registration/', RegistrationView.as_view(), name='registration'),
     path('logout/', UserLogout.as_view(), name='logout'),
     path('admin/', admin.site.urls)
+]
+urlpatterns += [
+    path('api-token-auth/', views.obtain_auth_token)
 ]
