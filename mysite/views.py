@@ -17,7 +17,6 @@ from django.shortcuts import render
 # Create your views here.
 from django_filters.views import FilterView
 
-
 from mysite.forms import RegistrationForm, LoginForm, HallForm, SeanceForm, OrderForm, SeanceUpdateForm
 from mysite.models import MyUser, Seance, Hall, Order
 
@@ -118,22 +117,11 @@ class SeanceUpdateView(PermissionRequiredMixin, UpdateView):
     success_url = '/cinema/'
 
     def post(self, request, *args, **kwargs):
-        # seance = Seance.objects.get(pk=self.kwargs['pk'])
         seance_pk = self.kwargs['pk']
         seance = Seance.objects.get(id=seance_pk)
         form = SeanceUpdateForm(request.POST, instance=seance)
         if form.is_valid():
             seance = form.save(commit=False)
-            # seance_id = self.kwargs['pk']
-            # seance = Seance.objects.get(id=seance_pk)
-            # seance.id = form.cleaned_data.get('pk')
-            # seance.title = form.cleaned_data['title']
-            # seance.ticket_value = form.cleaned_data['ticket_value']
-            # seance.hall = form.cleaned_data['hall']
-            # seance.tart = form.cleaned_data['start']
-            # seance.end = form.cleaned_data['end']
-            # seance.date_start = form.cleaned_data['date_start']
-            # seance.date_end = form.cleaned_data['date_end']
             seance.seats = seance.hall.places
             seance.save()
             messages.success(self.request, "You Update the seance")
@@ -142,38 +130,6 @@ class SeanceUpdateView(PermissionRequiredMixin, UpdateView):
             messages.warning(self.request, 'You must change hall/date/time')
         context = {'form': form}
         return render(request, 'update.html', context)
-
-    # def post(self, request, *args, **kwargs):
-    #     seance_id = self.kwargs['pk']
-    #     title = request.POST['title']
-    #     ticket_value = request.POST['ticket_value']
-    #     hall_id = request.POST['hall']
-    #     hall_create = Hall.objects.get(id=hall_id)
-    #     time_start = request.POST['start']
-    #     time_end = request.POST['end']
-    #     day_create = request.POST['date']
-    #
-    #     if Seance.objects.filter(hall=hall_create, date=day_create,
-    #                              start__range=(time_start, time_end)).exclude(id=seance_id) or Seance.objects.filter(
-    #         hall=hall_create,
-    #         date=day_create,
-    #         end__range=(
-    #                 time_start,
-    #                 time_end)).exclude(id=seance_id):
-    #
-    #         messages.warning(self.request, 'You must change hall/date/time')
-    #
-    #     else:
-    #         Seance.objects.filter(id=seance_id).update(title=title, hall=hall_create,
-    #                                                    date=day_create,
-    #                                                    start=time_start,
-    #                                                    end=time_end,
-    #                                                    ticket_value=ticket_value,
-    #                                                    seats=hall_create.places)
-    #
-    #         messages.success(self.request, "You change the seance")
-    #
-    #     return HttpResponseRedirect('/')
 
 
 class SeanceCreatView(PermissionRequiredMixin, CreateView):
@@ -187,13 +143,6 @@ class SeanceCreatView(PermissionRequiredMixin, CreateView):
         form = SeanceForm(request.POST)
         if form.is_valid():
             seance = form.save(commit=False)
-            # seance.title = form.cleaned_data['title']
-            # seance.ticket_value = form.cleaned_data['ticket_value']
-            # seance.hall = form.cleaned_data['hall']
-            # seance.start = form.cleaned_data['start']
-            # seance.end = form.cleaned_data['end']
-            # seance.date_start = form.cleaned_data['date_start']
-            # seance.date_end = form.cleaned_data['date_end']
             seance.seats = seance.hall.places
             seance.save()
             messages.success(self.request, "You create the new seance")
@@ -213,10 +162,6 @@ class SeanceTodayListView(ListView):
 
     def get_queryset(self):
         queryset = Seance.objects.filter(date_start__lte=date.today(), date_end__gte=date.today())
-        # a = str(date.today())
-        # q1 = Q(date_start__gte=date.today())
-        # q2 = Q(date_end__lte=date.today())
-        # queryset = Seance.objects.filter(q1 & q2)
         return queryset
 
 
@@ -231,8 +176,6 @@ class SeanceTomorrowListView(ListView):
         q1 = Q(date_start__lte=date.today() + timedelta(days=1))
         q2 = Q(date_end__gte=date.today() + timedelta(days=1))
         queryset = Seance.objects.filter(q1 & q2)
-        # queryset = Seance.objects.filter(date_start__lte=date.today() + timedelta(days=1),
-        #                                  date_end__gte=date.today() + timedelta(days=1))
         return queryset
 
 

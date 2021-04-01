@@ -2,7 +2,10 @@ from datetime import date
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
+
+from Cinema.settings import TIME_TO_DIE
 
 
 class MyUser(AbstractUser):
@@ -44,13 +47,6 @@ class Seance(models.Model):
             return True
         return False
 
-    # @property
-    # def today(self):
-    #     today = Seance.objects.get(date_start__lte=date.today(), date_end__gte=date.today())
-    #     if today:
-    #         return today
-    #     return None
-
 
 class Order(models.Model):
     customer = models.ForeignKey(MyUser, on_delete=models.CASCADE)
@@ -59,4 +55,4 @@ class Order(models.Model):
 
 
 class OurToken(Token):
-    time_to_die = models.DateTimeField(null=True)
+    time_to_die = models.DateTimeField(default=timezone.now() + TIME_TO_DIE)

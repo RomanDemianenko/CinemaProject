@@ -3,37 +3,34 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timezone, timedelta
 from rest_framework import serializers
-from mysite.models import MyUser, Order, Seance, Hall
+
+from Cinema.settings import TIME_TO_DIE
+from mysite.models import MyUser, Order, Seance, Hall, OurToken
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(required=True)
-    username = serializers.CharField(label="Username")
-    name = serializers.CharField(label='name')
-    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    confirm_password = serializers.CharField(write_only=True, required=True)
+    confirm_password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
 
     class Meta:
         model = MyUser
-        fields = ('username', 'name', 'email', 'password', 'confirm_password')
+        fields = ('id', 'username', 'email', 'password', 'cash', 'confirm_password')
 
-    def validate(self, attrs):
-        if attrs['password'] != attrs['confirm_password']:
-            raise serializers.ValidationError({"password": "Password fields didn't match."})
 
-        return attrs
+class EmptySerializer(serializers.Serializer):
+    pass
 
-    def create(self, validated_data):
-        user = MyUser.objects.create(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            name=validated_data['name'],
-        )
 
-        user.set_password(validated_data['password'])
-        user.save()
+class AuthUserSerializer(serializers.ModelSerializer):
+    auth_token = serializers.SerializerMethodField()
 
-        return user
+    class Meta:
+        model = MyUser
+        fields = ('id', 'username', 'email', 'password', 'cash', 'auth_token')
+        read_only_fields = ('id', 'email', 'cash')
+
+    def get_auth_token(self, obj):
+        token = OurToken.objects.create(user=obj)
+        return token.key
 
 
 class MyAuthTokenSerializer(serializers.Serializer):
@@ -48,13 +45,14 @@ class MyAuthTokenSerializer(serializers.Serializer):
             user = authenticate(request=self.context.get('request'), username=username, password=password)
 
             if not user:
-                error = ("We can`t user in our system")
+                error = ("We didn`t have this user in our system")
                 raise serializers.ValidationError(error)
 
         else:
             error = ("You should fill fields")
             raise serializers.ValidationError(error)
         attrs['user'] = user
+
         return attrs
 
 
@@ -120,16 +118,12 @@ class SeanceSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    # customer = MyUserSerializer()
-    # film = SeanceSerializer()
-
     class Meta:
         model = Order
         fields = ['customer', 'film', 'tickets']
 
     def validate(self, data):
         user_cash = data['customer'].cash
-        # user_cash = self.context['request'].user.cash
         if data['film'].ticket_value * data['tickets'] > user_cash:
             raise serializers.ValidationError('heyyyyy?')
         elif data['film'].seats < data['tickets']:

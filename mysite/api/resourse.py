@@ -1,4 +1,8 @@
 from datetime import datetime, date, timedelta
+
+from django.contrib.auth import authenticate, logout
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils import timezone
 # from time import timezone
 from rest_framework import exceptions, permissions
@@ -10,11 +14,58 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.decorators import action, permission_classes
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from Cinema.settings import TIME_TO_DIE
-from mysite.api.serializers import SeanceSerializer, OrderSerializer, MyAuthTokenSerializer, HallSerializer, \
-    SeanceUpdateSerializer
-from mysite.models import Seance, OurToken, Order, MyUser, Hall
+from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+
+from Cinema.settings import TIME_TO_DIE, AUTH_USER_MODEL
+from mysite.api.serializers import SeanceSerializer, OrderSerializer, HallSerializer, \
+    RegisterSerializer, MyUserSerializer, AuthUserSerializer, MyAuthTokenSerializer
+from mysite.models import Seance, Order, MyUser, Hall, OurToken
+
+
+class AuthViewSet(viewsets.ModelViewSet):
+    permission_classes = [AllowAny, ]
+    serializer_class = RegisterSerializer
+
+    @action(methods=['POST'], detail=False)
+    def register(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if serializer.validated_data['password'] != serializer.validated_data['confirm_password']:
+            return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+
+        user = MyUser.objects.create_user(
+            username=serializer.validated_data['username'],
+            email=serializer.validated_data['email'],
+            password=serializer.validated_data['password'],
+            cash=serializer.validated_data['cash'])
+        data = AuthUserSerializer(user).data
+        return Response(data=data, status=status.HTTP_201_CREATED)
+
+    @action(methods=['POST', ], detail=False)
+    def logout(self, request):
+        logout(request)
+        data = {'success': 'Sucessfully logged out'}
+        return Response(data=data, status=status.HTTP_200_OK)
+
+
+class AuthToken(ObtainAuthToken):
+    serializer_class = MyAuthTokenSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = serializer.validated_data['user']
+            token = OurToken.objects.get_or_create(user=user)
+
+            if token[0].time_to_die < timezone.now():
+                token[0].delete()
+                token = OurToken.objects.get_or_create(user=user)
+                token[0].time_to_die = timezone.now() + TIME_TO_DIE
+                token[0].save()
+
+            return Response({'token': token[0].key, 'username': user.username, })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class HallViewSet(viewsets.ModelViewSet):
@@ -33,6 +84,19 @@ class SeanceViewSet(viewsets.ModelViewSet):
     queryset = Seance.objects.all().order_by('id')
     serializer_class = SeanceSerializer
 
+    @action(detail=False)
+    def today(self, request, *args, **kwargs):
+        queryset = self.queryset.filter(date_start__lte=date.today(), date_end__gte=date.today())
+        serializer = SeanceSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False)
+    def tomorrow(self, request, *args, **kwargs):
+        queryset = self.queryset.filter(date_start__lte=date.today() + timedelta(days=1),
+                                        date_end__gte=date.today() + timedelta(days=1))
+        serializer = SeanceSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def put(self, request, *args, **kwargs):
         pk = self.kwargs.get('pk')
         seance = get_object_or_404(Seance.objects.filter(id=pk))
@@ -44,59 +108,45 @@ class SeanceViewSet(viewsets.ModelViewSet):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def create(self, request, *args, **kwargs):
-        serializer = SeanceSerializer(data=request.data)
-        if serializer.is_valid():
-            data = serializer.data
-            # seance = Seance.objects.all()
-            hall = Hall.objects.get(id=serializer.data.get('hall'))
-            # seats = hall.places
-            new_seance = Seance(
-                title=data.get('title'), hall=hall, date_start=data.get('date_start'), date_end=data.get('date_end'),
-                start=data.get('start'), end=data.get('end'), ticket_value=data.get('ticket_value'), used=0,
-                seats=hall.places)
-            new_seance.save()
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+def create(self, request, *args, **kwargs):
+    serializer = SeanceSerializer(data=request.data)
+    if serializer.is_valid():
+        data = serializer.data
+        # seance = Seance.objects.all()
+        hall = Hall.objects.get(id=serializer.data.get('hall'))
+        # seats = hall.places
+        new_seance = Seance(
+            title=data.get('title'), hall=hall, date_start=data.get('date_start'), date_end=data.get('date_end'),
+            start=data.get('start'), end=data.get('end'), ticket_value=data.get('ticket_value'), used=0,
+            seats=hall.places)
+        new_seance.save()
 
-    def perform_create(self, serializer):
-        serializer.save()
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def get_queryset(self):
+
+def perform_create(self, serializer):
+    serializer.save()
+
+
+def get_queryset(self):
+    queryset = Seance.objects.all()
+    hall_id = self.request.query_params.get('hall', None)
+    time1 = self.request.query_params.get('time1', None)
+    time2 = self.request.query_params.get('time2', None)
+
+    if hall_id:
+        hall = Hall.objects.get(id=hall_id)
+        queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today())
+
+    elif hall_id and time1 and time2:
+        hall = Hall.objects.get(id=hall_id)
+        queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today(),
+                                   start__gte=time1, end__lte=time2)
+    else:
         queryset = Seance.objects.all()
-        hall_id = self.request.query_params.get('hall', None)
-        # today = self.request.query_params.get('data_start', None)
-        time1 = self.request.query_params.get('time1', None)
-        time2 = self.request.query_params.get('time2', None)
 
-        if hall_id:
-            hall = Hall.objects.get(id=hall_id)
-            queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today())
-
-        elif hall_id and time1 and time2:
-            hall = Hall.objects.get(id=hall_id)
-            queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today(),
-                                       start__gte=time1, end__lte=time2)
-        else:
-            queryset = Seance.objects.all()
-
-        return queryset
-
-
-class AuthToken(ObtainAuthToken):
-    serializer_class = MyAuthTokenSerializer
-
-    def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-        token = OurToken.objects.get_or_create(user=user)
-        token.time_to_die = timezone.now() + timedelta(minutes=TIME_TO_DIE)
-        token.save()
-        return Response({
-            'token': token.key,
-            'username': user.username,
-        })
+    return queryset
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -127,17 +177,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Order.objects.filter(customer=user)
         return queryset
-
-    def update(self, request, *args, **kwargs):
-        serializer = OrderSerializer(data=request.data)
-        seance_id = self.i
-
-    # def get_context_data(self, **kwargs):
-    #     user = self.request.user
-    #     context = self.get_context_data(**kwargs)
-    #     context['total_prices'] = Order.objects.filter(customer=user).aggregate(
-    #         avg=Sum(F('film__ticket_value') * F('tickets'), output_field=FloatField())).get('avg')
-    #     return context
 
 
 class Authentication(BaseAuthentication):

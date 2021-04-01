@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'Cinema',
     'mysite',
     'rest_framework',
+    'rest_framework.authtoken',
     'mathfilters',
     'django_filters'
 ]
@@ -80,7 +81,7 @@ WSGI_APPLICATION = 'Cinema.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite8',
+        'NAME': BASE_DIR / 'db.sqlite9',
     }
 }
 
@@ -106,6 +107,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
+
+
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated'
@@ -134,6 +137,6 @@ AUTH_USER_MODEL = 'mysite.MyUser'
 
 # SESSION_COOKIE_AGE = 5 * 60
 
-LOGOUT_TIME = timedelta(seconds=5 * 1)
+LOGOUT_TIME = timedelta(seconds=5 * 100)
 
 TIME_TO_DIE = timedelta(seconds=5 * 60)
