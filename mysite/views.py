@@ -82,6 +82,9 @@ class UserLogout(LogoutView):
 
 
 class SeanceListView(ListView, FilterView):
+    """
+    Seance`s list, and there I wrote sort of seance
+    """
     model = Seance
     form = SeanceForm
     ordering = ['-id']
@@ -110,6 +113,9 @@ class HallCreatView(PermissionRequiredMixin, CreateView):
 
 
 class SeanceUpdateView(PermissionRequiredMixin, UpdateView):
+    """
+    There is seance update, it`s available only for admin
+    """
     permission_required = 'request.user.is_superuser'
     model = Seance
     form_class = SeanceUpdateForm
@@ -133,6 +139,9 @@ class SeanceUpdateView(PermissionRequiredMixin, UpdateView):
 
 
 class SeanceCreatView(PermissionRequiredMixin, CreateView):
+    """
+    There is seance create, it`s available only for admin
+    """
     permission_required = 'request.user.is_superuser'
     model = Seance
     form_class = SeanceForm
@@ -153,19 +162,10 @@ class SeanceCreatView(PermissionRequiredMixin, CreateView):
         return render(request, 'create.html', context)
 
 
-class SeanceTodayListView(ListView):
-    model = Seance
-    form = SeanceForm
-    paginate_by = 5
-    ordering = ['date_start']
-    template_name = 'today.html'
-
-    def get_queryset(self):
-        queryset = Seance.objects.filter(date_start__lte=date.today(), date_end__gte=date.today())
-        return queryset
-
-
 class SeanceTomorrowListView(ListView):
+    """
+    There`s listview for seances, which will happen tomorrow
+    """
     model = Seance
     form = SeanceForm
     paginate_by = 5
@@ -180,6 +180,9 @@ class SeanceTomorrowListView(ListView):
 
 
 class BuyingCreateView(LoginRequiredMixin, CreateView):
+    """
+    It`s process of buying. Also, there I wrote how change user and seance items
+    """
     login_url = '/login/'
     model = Order
     form_class = OrderForm
@@ -211,6 +214,9 @@ class BuyingCreateView(LoginRequiredMixin, CreateView):
 
 
 class OrdersListView(LoginRequiredMixin, ListView):
+    """
+    It`s order list. User can see what he bought, and how mach he spent for all time
+    """
     model = Order
     form = OrderForm
     paginate_by = 5

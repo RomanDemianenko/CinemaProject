@@ -9,6 +9,7 @@ from mysite.models import MyUser, Order, Seance, Hall, OurToken
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     confirm_password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
 
     class Meta:
@@ -16,11 +17,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'password', 'cash', 'confirm_password')
 
 
-class EmptySerializer(serializers.Serializer):
-    pass
-
-
 class AuthUserSerializer(serializers.ModelSerializer):
+    """
+    This serializer I use for registration and logout
+    """
     auth_token = serializers.SerializerMethodField()
 
     class Meta:
@@ -80,10 +80,6 @@ class HallSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         hall = Hall.objects.create(**validated_data)
         return hall
-
-
-def place_default():
-    return Hall.places
 
 
 class SeanceSerializer(serializers.ModelSerializer):

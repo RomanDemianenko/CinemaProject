@@ -4,7 +4,6 @@ from django.contrib.auth import authenticate, logout
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-# from time import timezone
 from rest_framework import exceptions, permissions
 from django.db.models import Sum, Avg, Func, F, FloatField, Q
 from rest_framework import viewsets, status
@@ -17,13 +16,14 @@ from rest_framework.decorators import action, permission_classes
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 
-from Cinema.settings import TIME_TO_DIE, AUTH_USER_MODEL
+from Cinema.settings import TIME_TO_DIE, AUTH_USER_MODEL, USED
 from mysite.api.serializers import SeanceSerializer, OrderSerializer, HallSerializer, \
-    RegisterSerializer, MyUserSerializer, AuthUserSerializer, MyAuthTokenSerializer
+    RegisterSerializer, AuthUserSerializer, MyAuthTokenSerializer
 from mysite.models import Seance, Order, MyUser, Hall, OurToken
 
 
 class AuthViewSet(viewsets.ModelViewSet):
+    """There I used decorate @action for registration and logout"""
     permission_classes = [AllowAny, ]
     serializer_class = RegisterSerializer
 
@@ -50,6 +50,7 @@ class AuthViewSet(viewsets.ModelViewSet):
 
 
 class AuthToken(ObtainAuthToken):
+    """There I wrote create Token and his rewrite after N time"""
     serializer_class = MyAuthTokenSerializer
 
     def post(self, request, *args, **kwargs):
@@ -81,8 +82,70 @@ class HallViewSet(viewsets.ModelViewSet):
 
 
 class SeanceViewSet(viewsets.ModelViewSet):
-    queryset = Seance.objects.all().order_by('id')
+    """There I wrote create, update for seance. Also, I use decorate @action fro sort by value/seance start time/today seances
+    / and tomorrow seances. And I used get_queryset for getting some filters
+    """
+    queryset = Seance.objects.all()
     serializer_class = SeanceSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = SeanceSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.data
+            hall = Hall.objects.get(id=serializer.data.get('hall'))
+            new_seance = Seance(
+                title=data.get('title'), hall=hall, date_start=data.get('date_start'), date_end=data.get('date_end'),
+                start=data.get('start'), end=data.get('end'), ticket_value=data.get('ticket_value'), used=USED,
+                seats=hall.places)
+            new_seance.save()
+            return Response(serializer.errors, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    def get_queryset(self):
+        queryset = Seance.objects.all()
+        hall_id = self.request.query_params.get('hall', None)
+        time1 = self.request.query_params.get('time1', None)
+        time2 = self.request.query_params.get('time2', None)
+
+        if hall_id:
+            hall = Hall.objects.get(id=hall_id)
+            queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today())
+
+        elif hall_id and time1 and time2:
+            hall = Hall.objects.get(id=hall_id)
+            queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today(),
+                                       start__gte=time1, end__lte=time2)
+        else:
+            queryset = Seance.objects.all()
+
+        return queryset
+
+    def put(self, request, *args, **kwargs):
+        pk = self.kwargs.get('pk')
+        seance = get_object_or_404(Seance.objects.filter(id=pk))
+        serializer = SeanceSerializer(instance=seance, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.errors, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False)
+    def value(self, request, *args, **kwargs):
+        queryset = self.queryset.order_by('ticket_value')
+        serializer = SeanceSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False)
+    def start(self, request, *args, **kwargs):
+        queryset = self.queryset.order_by('start')
+        serializer = SeanceSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False)
     def today(self, request, *args, **kwargs):
@@ -97,59 +160,11 @@ class SeanceViewSet(viewsets.ModelViewSet):
         serializer = SeanceSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def put(self, request, *args, **kwargs):
-        pk = self.kwargs.get('pk')
-        seance = get_object_or_404(Seance.objects.filter(id=pk))
-        serializer = SeanceSerializer(instance=seance, data=request.data, partial=True)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.errors, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-def create(self, request, *args, **kwargs):
-    serializer = SeanceSerializer(data=request.data)
-    if serializer.is_valid():
-        data = serializer.data
-        # seance = Seance.objects.all()
-        hall = Hall.objects.get(id=serializer.data.get('hall'))
-        # seats = hall.places
-        new_seance = Seance(
-            title=data.get('title'), hall=hall, date_start=data.get('date_start'), date_end=data.get('date_end'),
-            start=data.get('start'), end=data.get('end'), ticket_value=data.get('ticket_value'), used=0,
-            seats=hall.places)
-        new_seance.save()
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-def perform_create(self, serializer):
-    serializer.save()
-
-
-def get_queryset(self):
-    queryset = Seance.objects.all()
-    hall_id = self.request.query_params.get('hall', None)
-    time1 = self.request.query_params.get('time1', None)
-    time2 = self.request.query_params.get('time2', None)
-
-    if hall_id:
-        hall = Hall.objects.get(id=hall_id)
-        queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today())
-
-    elif hall_id and time1 and time2:
-        hall = Hall.objects.get(id=hall_id)
-        queryset = queryset.filter(hall=hall, date_start__lte=date.today(), date_end__gte=date.today(),
-                                   start__gte=time1, end__lte=time2)
-    else:
-        queryset = Seance.objects.all()
-
-    return queryset
-
 
 class OrderViewSet(viewsets.ModelViewSet):
+    """
+    There I wrote buying process and getting buying history
+    """
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = (IsAuthenticated,)

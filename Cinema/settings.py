@@ -140,3 +140,5 @@ AUTH_USER_MODEL = 'mysite.MyUser'
 LOGOUT_TIME = timedelta(seconds=5 * 100)
 
 TIME_TO_DIE = timedelta(seconds=5 * 60)
+
+USED = 0

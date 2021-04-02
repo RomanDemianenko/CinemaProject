@@ -29,6 +29,9 @@ def place_default():
 
 
 class Seance(models.Model):
+    """
+    Create the seance, seats automatic equals to hall.places
+    """
     title = models.CharField(max_length=20)
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE)
     date_start = models.DateField()
@@ -55,4 +58,7 @@ class Order(models.Model):
 
 
 class OurToken(Token):
+    """
+    We add field, which show how long token will live
+    """
     time_to_die = models.DateTimeField(default=timezone.now() + TIME_TO_DIE)

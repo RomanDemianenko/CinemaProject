@@ -46,6 +46,9 @@ class HallForm(ModelForm):
 
 
 class SeanceForm(ModelForm):
+    """
+    There we write seances`s validate for create, seance must not overlap
+    """
     def clean(self):
         hall = self.cleaned_data.get('hall')
         time_start = self.cleaned_data.get('start')
@@ -70,6 +73,10 @@ class SeanceForm(ModelForm):
 
 
 class SeanceUpdateForm(ModelForm):
+    """
+    There we write seance`s update. We have 2 forms, because we should exclude itself seance for update. If we have seance
+    from 2 to 4, and want to change on from 2 to 3.45, we must use exclude itself.
+    """
     class Meta:
         model = Seance
         fields = ['id', 'title', 'hall', 'date_start', 'date_end', 'start', 'end', 'ticket_value']
@@ -97,6 +104,9 @@ class SeanceUpdateForm(ModelForm):
 
 
 class OrderForm(ModelForm):
+    """
+    There`s order`s valid, if cutomer don`t have enough money, or we don`t have enough tickets
+    """
     class Meta:
         model = Order
         fields = '__all__'
